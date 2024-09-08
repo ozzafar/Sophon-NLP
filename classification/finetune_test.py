@@ -38,24 +38,9 @@ import wandb
 import timm
 
 
-def test_finetune(model, trainset, testset, epochs, lr):
+def test_final(args, node, model, testset):
     model = nn.DataParallel(model)
-    trainloader = DataLoader(trainset, batch_size=256, shuffle=True, num_workers=4,drop_last=True)
-    testloader = DataLoader(testset, batch_size=256, shuffle=False, num_workers=4,drop_last=True)
-    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
-    criterion = nn.CrossEntropyLoss()
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
-    model.train()
-    # epochs = 1
-    for ep in tqdm(range(epochs)):
-        for inputs, targets in tqdm(trainloader):
-            inputs, targets = inputs.cuda(), targets.cuda()  
-            outputs = model(inputs)
-            loss = criterion(outputs, targets)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-        # scheduler.step()
+    testloader = DataLoader(testset, batch_size=args.bs, shuffle=False, num_workers=4,drop_last=True)
     model.eval()
     acc, test_loss = test(model, testloader, torch.device('cuda'))
     return round(acc,2), round(test_loss,2)
@@ -113,9 +98,15 @@ if __name__ == '__main__':
         acc, test_loss = test_finetune_final(args, 'normal pretrained/direct all', model.cuda(), trainset_tar, testset_tar, args.truly_finetune_epochs, args.finetune_lr)
 
     # ### train from scratch
-    elif args.start == 'sratch':
+    elif args.start == 'scratch':
         print('========test train from scratch=========')
         acc, test_loss = test_finetune_final(args, 'train from scratch/', model.cuda(), trainset_tar, testset_tar, args.truly_finetune_epochs, args.finetune_lr)
-    
+
+    # ### train from scratch
+    elif args.start == 'test':
+        print('========test without train=========')
+        model = get_pretrained_model(args)
+        acc, test_loss = test_final(args, 'test/', model.cuda(), testset_tar)
+
     else:
         assert(0)

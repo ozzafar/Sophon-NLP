@@ -3,8 +3,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
+from scipy.special import softmax
+from torch.nn.modules.module import T
 from torchvision.models.resnet import ResNet
 from torchvision.models.resnet import BasicBlock, Bottleneck
+from transformers import GPT2LMHeadModel, GPT2ForSequenceClassification, GPT2Tokenizer
+
 
 # 定义ResNet-18结构
 def resnet18(pretrained=False, **kwargs):
@@ -137,3 +141,42 @@ model_urls = {
     'vgg16_bn': 'https://download.pytorch.org/models/vgg16_bn-6c64b313.pth',
     'vgg19_bn': 'https://download.pytorch.org/models/vgg19_bn-c79401a0.pth',
 }
+
+class GPT2SentimentAnalysisZeroShot(GPT2LMHeadModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+
+    def __call__(self, *args, **kwargs):
+
+        outputs = super().__call__(*args, **kwargs)
+
+        # The raw scores (unnormalized probabilities) for all tokens
+        logits = outputs.logits
+
+        # Get the logits for the last token in the input
+        last_token_logits = logits[0, -1, :]  # Shape: (vocab_size,)
+
+        # Token IDs for "positive" and "negative"
+        # TODO make constand and remove tokenizer
+        # TODO try good/bad
+        negative_id = self.tokenizer.encode("negative", add_special_tokens=False)[0]
+        positive_id = self.tokenizer.encode("positive", add_special_tokens=False)[0]
+
+        sentiment_logits = torch.tensor([last_token_logits[negative_id], last_token_logits[positive_id]]).numpy()
+
+        # Apply softmax to get probabilities
+        sentiment_probabilities = softmax(sentiment_logits)
+
+        positive_prob = sentiment_probabilities[1]
+
+        # override/add result to outputs
+        return positive_prob
+
+def gpt2_zeroshot(pretrained=False, **kwargs):
+    model = GPT2SentimentAnalysisZeroShot.from_pretrained("gpt2", **kwargs)
+    return model
+
+def gpt2(pretrained=False, **kwargs):
+    model = GPT2ForSequenceClassification.from_pretrained("gpt2", num_labels=2, **kwargs)
+    return model

@@ -3,6 +3,7 @@
 
 import time
 import numpy as np
+from datasets import load_dataset
 from torch.nn import CrossEntropyLoss
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -24,7 +25,6 @@ import learn2learn as l2l
 from torch.utils.data import DataLoader, Dataset
 import torch.nn.init as init
 import csv
-from lib import VGG, make_layers, cfg
 from PIL import Image
 from typing import (
     Generic,
@@ -38,6 +38,9 @@ from typing import (
     Union,
     Dict
 )
+
+from transformers import GPT2Tokenizer
+
 dataTransform = transforms.Compose([
     transforms.ToPILImage(),
     transforms.Resize((64, 64)),
@@ -372,8 +375,27 @@ def get_dataset(dataset, data_path, subset="imagenette", args=None):
         trainset = stl_Dataset([list_img_train, list_label_train])
         testset = stl_Dataset([list_img_test, list_label_test])
 
+    if dataset == 'IMDB':
+        dataset = load_dataset("imdb").shuffle(seed=42)
+        train_dataset, test_dataset = dataset["train"], dataset["test"]
+
+        # tokenization
+        tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        tokenizer.pad_token = tokenizer.eos_token
+
+        preprocess_function = None
+        if args.arch == 'gpt2':
+            preprocess_function = lambda examples: tokenizer(examples["text"], truncation=True,  padding="max_length",  max_length=512)
+        elif args.arch == 'gpt2-zeroshot':
+            generate_prompt = lambda text: f"Analyze the sentiment of the following text: '{text}'. The sentiment is "
+            preprocess_function = lambda examples: tokenizer([generate_prompt(text) for text in examples["text"]])
+
+        trainset = train_dataset.map(preprocess_function, batched=True)
+        testset = test_dataset.map(preprocess_function, batched=True)
+
     else:
         exit('unknown dataset: %s'%dataset)
+
     return trainset, testset
 
 def process(checkpoint):
@@ -393,110 +415,110 @@ def get_default_convnet_setting():
 
 
 
-def get_network(model, channel, num_classes, im_size=(32, 32), dist=True):
-    torch.random.manual_seed(int(time.time() * 1000) % 100000)
-    print(f"----------------Using {model} Model----------------")
-    net_width, net_depth, net_act, net_norm, net_pooling = get_default_convnet_setting()
-
-    if model == 'MLP':
-        net = MLP(channel=channel, num_classes=num_classes)
-    elif model == 'ConvNet':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
-    elif model == 'LeNet':
-        net = LeNet(channel=channel, num_classes=num_classes)
-    elif model == 'AlexNet':
-        net = AlexNet(channel=channel, num_classes=num_classes)
-    elif model == 'VGG11':
-        net = VGG11( channel=channel, num_classes=num_classes)
-    elif model == 'VGG11BN':
-        net = VGG11BN(channel=channel, num_classes=num_classes)
-    elif model == 'ResNet18':
-        net = ResNet18(channel=channel, num_classes=num_classes)
-    elif model == 'ResNet18BN_AP':
-        net = ResNet18BN_AP(channel=channel, num_classes=num_classes)
-    elif model == 'ResNet18_AP':
-        net = ResNet18_AP(channel=channel, num_classes=num_classes)
-
-    elif model == 'ConvNetD1':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=1, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
-    elif model == 'ConvNetD2':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=2, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
-    elif model == 'ConvNetD3':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=3, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
-    elif model == 'ConvNetD4':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=4, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
-    elif model == 'ConvNetD5':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=5, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
-    elif model == 'ConvNetD6':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=6, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
-    elif model == 'ConvNetD7':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=7, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
-    elif model == 'ConvNetD8':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=8, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
-
-
-    elif model == 'ConvNetW32':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=32, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling)
-    elif model == 'ConvNetW64':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=64, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling)
-    elif model == 'ConvNetW128':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=128, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling)
-    elif model == 'ConvNetW256':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=256, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling)
-    elif model == 'ConvNetW512':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=512, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling)
-    elif model == 'ConvNetW1024':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=1024, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling)
-
-    elif model == "ConvNetKIP":
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=1024, net_depth=net_depth, net_act=net_act,
-                      net_norm="none", net_pooling=net_pooling)
-
-    elif model == 'ConvNetAS':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act='sigmoid', net_norm=net_norm, net_pooling=net_pooling)
-    elif model == 'ConvNetAR':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act='relu', net_norm=net_norm, net_pooling=net_pooling)
-    elif model == 'ConvNetAL':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act='leakyrelu', net_norm=net_norm, net_pooling=net_pooling)
-
-    elif model == 'ConvNetNN':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm='none', net_pooling=net_pooling)
-    elif model == 'ConvNetBN':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm='batchnorm', net_pooling=net_pooling)
-    elif model == 'ConvNetLN':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm='layernorm', net_pooling=net_pooling)
-    elif model == 'ConvNetIN':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm='instancenorm', net_pooling=net_pooling)
-    elif model == 'ConvNetGN':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm='groupnorm', net_pooling=net_pooling)
-
-    elif model == 'ConvNetNP':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling='none')
-    elif model == 'ConvNetMP':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling='maxpooling')
-    elif model == 'ConvNetAP':
-        net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling='avgpooling')
-
-    ###
-    elif model == 'WideRes':
-        net = WideResNet(channel=channel, num_classes=num_classes)
-
-
-    else:
-        net = None
-        exit('DC error: unknown model')
-
-    if dist:
-        gpu_num = torch.cuda.device_count()
-        if gpu_num>0:
-            device = 'cuda'
-            if gpu_num>1:
-                net = nn.DataParallel(net)
-        else:
-            device = 'cpu'
-        net = net.to(device)
-
-    return net
+# def get_network(model, channel, num_classes, im_size=(32, 32), dist=True):
+#     torch.random.manual_seed(int(time.time() * 1000) % 100000)
+#     print(f"----------------Using {model} Model----------------")
+#     net_width, net_depth, net_act, net_norm, net_pooling = get_default_convnet_setting()
+#
+#     if model == 'MLP':
+#         net = MLP(channel=channel, num_classes=num_classes)
+#     elif model == 'ConvNet':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
+#     elif model == 'LeNet':
+#         net = LeNet(channel=channel, num_classes=num_classes)
+#     elif model == 'AlexNet':
+#         net = AlexNet(channel=channel, num_classes=num_classes)
+#     elif model == 'VGG11':
+#         net = VGG11( channel=channel, num_classes=num_classes)
+#     elif model == 'VGG11BN':
+#         net = VGG11BN(channel=channel, num_classes=num_classes)
+#     elif model == 'ResNet18':
+#         net = ResNet18(channel=channel, num_classes=num_classes)
+#     elif model == 'ResNet18BN_AP':
+#         net = ResNet18BN_AP(channel=channel, num_classes=num_classes)
+#     elif model == 'ResNet18_AP':
+#         net = ResNet18_AP(channel=channel, num_classes=num_classes)
+#
+#     elif model == 'ConvNetD1':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=1, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
+#     elif model == 'ConvNetD2':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=2, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
+#     elif model == 'ConvNetD3':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=3, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
+#     elif model == 'ConvNetD4':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=4, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
+#     elif model == 'ConvNetD5':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=5, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
+#     elif model == 'ConvNetD6':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=6, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
+#     elif model == 'ConvNetD7':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=7, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
+#     elif model == 'ConvNetD8':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=8, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
+#
+#
+#     elif model == 'ConvNetW32':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=32, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling)
+#     elif model == 'ConvNetW64':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=64, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling)
+#     elif model == 'ConvNetW128':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=128, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling)
+#     elif model == 'ConvNetW256':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=256, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling)
+#     elif model == 'ConvNetW512':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=512, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling)
+#     elif model == 'ConvNetW1024':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=1024, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling)
+#
+#     elif model == "ConvNetKIP":
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=1024, net_depth=net_depth, net_act=net_act,
+#                       net_norm="none", net_pooling=net_pooling)
+#
+#     elif model == 'ConvNetAS':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act='sigmoid', net_norm=net_norm, net_pooling=net_pooling)
+#     elif model == 'ConvNetAR':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act='relu', net_norm=net_norm, net_pooling=net_pooling)
+#     elif model == 'ConvNetAL':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act='leakyrelu', net_norm=net_norm, net_pooling=net_pooling)
+#
+#     elif model == 'ConvNetNN':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm='none', net_pooling=net_pooling)
+#     elif model == 'ConvNetBN':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm='batchnorm', net_pooling=net_pooling)
+#     elif model == 'ConvNetLN':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm='layernorm', net_pooling=net_pooling)
+#     elif model == 'ConvNetIN':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm='instancenorm', net_pooling=net_pooling)
+#     elif model == 'ConvNetGN':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm='groupnorm', net_pooling=net_pooling)
+#
+#     elif model == 'ConvNetNP':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling='none')
+#     elif model == 'ConvNetMP':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling='maxpooling')
+#     elif model == 'ConvNetAP':
+#         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling='avgpooling')
+#
+#     ###
+#     elif model == 'WideRes':
+#         net = WideResNet(channel=channel, num_classes=num_classes)
+#
+#
+#     else:
+#         net = None
+#         exit('DC error: unknown model')
+#
+#     if dist:
+#         gpu_num = torch.cuda.device_count()
+#         if gpu_num>0:
+#             device = 'cuda'
+#             if gpu_num>1:
+#                 net = nn.DataParallel(net)
+#         else:
+#             device = 'cpu'
+#         net = net.to(device)
+#
+#     return net
 
 
 
@@ -681,7 +703,7 @@ def get_pretrained_model(args, partial_finetuned=False):
             for param in model.fc.parameters():
                 param.requires_grad = True
         return model.cuda()
-    
+
     elif args.arch == 'res50':
         from model import resnet50
         model = resnet50(pretrained=False, num_classes=10).cuda()
@@ -692,6 +714,27 @@ def get_pretrained_model(args, partial_finetuned=False):
             for param in model.fc.parameters():
                 param.requires_grad = True
         return model.cuda()
+
+    elif args.arch == 'gpt2':
+        from model import gpt2
+        model = gpt2(pretrained=False).cuda()
+        if partial_finetuned:
+            for param in model.parameters():
+                param.requires_grad = False
+            for param in model.fc.parameters():
+                param.requires_grad = True
+        return model.cuda()
+
+    elif args.arch == 'gpt2-zeroshot':
+        from model import gpt2_zeroshot
+        model = gpt2_zeroshot(pretrained=False).cuda()
+        if partial_finetuned:
+            for param in model.parameters():
+                param.requires_grad = False
+            for param in model.fc.parameters():
+                param.requires_grad = True
+        return model.cuda()
+
     else:
         assert(0)
 
