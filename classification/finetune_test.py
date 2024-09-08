@@ -49,38 +49,43 @@ def test_finetune_final(args, mode, model, trainset, testset, epochs, lr):
     model = nn.DataParallel(model)
     trainloader = DataLoader(trainset, batch_size=args.bs, shuffle=True, num_workers=4,drop_last=True)
     testloader = DataLoader(testset, batch_size=args.bs, shuffle=False, num_workers=4,drop_last=True)
-    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
+    optimizer = optim.SGD(model.module.score.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
     criterion = nn.CrossEntropyLoss()
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
     model.train()
+    model.enable_input_require_grads()
     accs = []
     losses = []
-    # epochs = 1
     for ep in tqdm(range(epochs)):
         model.train()
-        for inputs, targets in trainloader:
-            inputs, targets = inputs.cuda(), targets.cuda()  
-            outputs = model(inputs)
-            loss = criterion(outputs, targets)
+        train_loss = 0
+        for batch in trainloader:
+            inputs, targets, attention_mask = torch.stack(batch["input_ids"], dim=1).cuda(), batch["label"].cuda(), torch.stack(batch["attention_mask"], dim=1).cuda()
+            targets = torch.tensor(targets, dtype=torch.long).cuda()
+            outputs = model(inputs, attention_mask=attention_mask)
+            loss = criterion(outputs.logits, targets)
+            loss.retain_grad()
+            outputs.logits.retain_grad()
+            train_loss += loss.item()
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        test_acc, test_loss = test(model, testloader, torch.device('cuda'))
-        accs.append(test_acc)
-        losses.append(test_loss)
-        wandb.log({f'{mode}: test accuracy':test_acc, f'{mode}: test loss':test_loss,})
-    print(f'test accuracy is {accs}, test loss is {losses}')
-    return round(test_acc,2), round(test_loss,2)
+        wandb.log({f'{mode}: train loss': train_loss / len(trainloader.dataset)})
+        # test_acc, test_loss = test(model, testloader, torch.device('cuda'))
+        # accs.append(test_acc)
+        # losses.append(test_loss)
+        # wandb.log({f'{mode}: test accuracy':test_acc, f'{mode}: test loss':test_loss,})
+    # print(f'test accuracy is {accs}, test loss is {losses}')
+    # return round(test_acc,2), round(test_loss,2)
 
 if __name__ == '__main__':
     args = args_parser()
-    import wandb 
+    import wandb
     wandb.init(
-    project="sohpon classification finetune test",  
-    entity="sophon",
-    config = args,
-    name = f"{args.arch}_{args.dataset}" ,
-    notes = args.notes)   
+        project="sophon classification finetune test nlp",
+        config = args,
+        name = f"{args.arch}_{args.dataset}" ,
+        notes = args.notes)
     seed = args.seed
     set_seed(seed)
     trainset_tar, testset_tar = get_dataset(args.dataset, '../../../datasets', args=args)

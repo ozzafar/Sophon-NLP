@@ -375,9 +375,9 @@ def get_dataset(dataset, data_path, subset="imagenette", args=None):
         trainset = stl_Dataset([list_img_train, list_label_train])
         testset = stl_Dataset([list_img_test, list_label_test])
 
-    if dataset == 'IMDB':
+    elif dataset.upper() == 'IMDB':
         dataset = load_dataset("imdb").shuffle(seed=42)
-        train_dataset, test_dataset = dataset["train"], dataset["test"]
+        train_dataset, test_dataset = dataset["train"].select(range(1000)), dataset["test"].select(range(100))
 
         # tokenization
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -718,21 +718,20 @@ def get_pretrained_model(args, partial_finetuned=False):
     elif args.arch == 'gpt2':
         from model import gpt2
         model = gpt2(pretrained=False).cuda()
-        if partial_finetuned:
-            for param in model.parameters():
-                param.requires_grad = False
-            for param in model.fc.parameters():
-                param.requires_grad = True
+        # for param in model.parameters():
+        #     param.requires_grad = False
+        # for param in model.score.parameters():
+        #     param.requires_grad = True
         return model.cuda()
 
     elif args.arch == 'gpt2-zeroshot':
         from model import gpt2_zeroshot
         model = gpt2_zeroshot(pretrained=False).cuda()
-        if partial_finetuned:
-            for param in model.parameters():
-                param.requires_grad = False
-            for param in model.fc.parameters():
-                param.requires_grad = True
+        # if partial_finetuned:
+        #     for param in model.parameters():
+        #         param.requires_grad = False
+        #     for param in model.fc.parameters():
+        #         param.requires_grad = True
         return model.cuda()
 
     else:
