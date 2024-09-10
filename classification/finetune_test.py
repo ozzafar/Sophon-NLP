@@ -61,11 +61,8 @@ def test_finetune_final(args, mode, model, trainset, testset, epochs, lr):
         train_loss = 0
         for batch in trainloader:
             inputs, targets, attention_mask = torch.stack(batch["input_ids"], dim=1).cuda(), batch["label"].cuda(), torch.stack(batch["attention_mask"], dim=1).cuda()
-            targets = torch.tensor(targets, dtype=torch.long).cuda()
             outputs = model(inputs, attention_mask=attention_mask)
             loss = criterion(outputs.logits, targets)
-            loss.retain_grad()
-            outputs.logits.retain_grad()
             train_loss += loss.item()
             optimizer.zero_grad()
             loss.backward()
