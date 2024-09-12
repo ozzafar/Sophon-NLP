@@ -388,7 +388,7 @@ def get_dataset(dataset, data_path, subset="imagenette", args=None):
             preprocess_function = lambda examples: tokenizer(examples["text"], truncation=True,  padding="max_length",  max_length=512)
         elif args.arch == 'gpt2-zeroshot':
             generate_prompt = lambda text: f"Analyze the sentiment of the following text: '{text}'. The sentiment is "
-            preprocess_function = lambda examples: tokenizer([generate_prompt(text) for text in examples["text"]])
+            preprocess_function = lambda examples: tokenizer([generate_prompt(text) for text in examples["text"]], truncation=True,  padding="max_length",  max_length=512)
 
         trainset = train_dataset.map(preprocess_function, batched=True)
         testset = test_dataset.map(preprocess_function, batched=True)
