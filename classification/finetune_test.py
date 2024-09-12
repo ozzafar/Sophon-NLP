@@ -53,7 +53,6 @@ def test_finetune_final(args, mode, model, trainset, testset, epochs, lr):
     criterion = nn.CrossEntropyLoss()
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
     model.train()
-    model.enable_input_require_grads()
     accs = []
     losses = []
     for ep in tqdm(range(epochs)):
@@ -112,3 +111,5 @@ if __name__ == '__main__':
 
     else:
         assert(0)
+
+    print(f'test accuracy is {acc}, test loss is {test_loss}')

@@ -157,7 +157,7 @@ def main(
         # torch.cuda.manual_seed(seed)
         device = torch.device('cuda')
     wandb.log({'seed':seed})
-        save_path = args.root + '/inverse_loss'+ '/'+args.arch+'_'+ args.dataset + '/'
+    save_path = args.root + '/inverse_loss' + '/' + args.arch+'_' + args.dataset + '/'
     adaptation_steps = args.adaptation_steps
     now = datetime.now()
     save_path = save_path + '/' + f'{now.month}_{now.day}_{now.hour}_{now.minute}_{now.second}/'
