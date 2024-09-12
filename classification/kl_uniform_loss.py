@@ -21,7 +21,7 @@ def args_parser():
     parser.add_argument('--test_iterval', default=10, type=int)
     parser.add_argument('--arch', default='', type=str)
     parser.add_argument('--gpus', default='0,1', type=str)
-    parser.add_argument('--dataset', default='CIFAR10', type=str, choices=['CIFAR10', 'MNIST', 'SVHN', 'STL', 'CINIC'])
+    parser.add_argument('--dataset', default='CIFAR10', type=str, choices=['CIFAR10', 'MNIST', 'SVHN', 'STL', 'CINIC', 'IMDB'])
     parser.add_argument('--finetune_epochs', default=1, type=int)
     parser.add_argument('--truly_finetune_epochs', default=20, type=int)
     parser.add_argument('--finetune_lr', default=0.0001, type=float)

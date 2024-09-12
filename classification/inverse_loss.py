@@ -19,7 +19,7 @@ def args_parser():
     parser.add_argument('--test_iterval', default=10, type=int)
     parser.add_argument('--arch', default='caformer', type=str)
     parser.add_argument('--gpus', default='0,1', type=str)
-    parser.add_argument('--dataset', default='', type=str, choices=['CIFAR10', 'MNIST', 'SVHN', 'STL', 'CINIC'])
+    parser.add_argument('--dataset', default='', type=str, choices=['CIFAR10', 'MNIST', 'SVHN', 'STL', 'CINIC', 'IMDB'])
     parser.add_argument('--finetune_epochs', default=1, type=int)
     parser.add_argument('--truly_finetune_epochs', default=20, type=int)
     parser.add_argument('--finetune_lr', default=0.0001, type=float)
@@ -143,7 +143,7 @@ def main(
 
     wandb.init(
     project="sophon classification",  
-    entity="sophon",
+    # entity="sophon",
     config = args,
     name = f"{args.dataset}_alpha{args.alpha}_beta{args.beta}_ml{args.ml_loop}_nl{args.nl_loop}_batches{args.adaptation_steps}" ,
     notes= args.notes,         
@@ -157,7 +157,7 @@ def main(
         # torch.cuda.manual_seed(seed)
         device = torch.device('cuda')
     wandb.log({'seed':seed})
-        save_path = args.root + '/inverse_loss'+ '/'+args.arch+'_'+ args.dataset + '/'
+    save_path = args.root + '/inverse_loss'+ '/'+args.arch+'_'+ args.dataset + '/'
     adaptation_steps = args.adaptation_steps
     now = datetime.now()
     save_path = save_path + '/' + f'{now.month}_{now.day}_{now.hour}_{now.minute}_{now.second}/'
