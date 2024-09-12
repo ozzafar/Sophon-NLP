@@ -179,4 +179,10 @@ def gpt2_zeroshot(pretrained=False, **kwargs):
 
 def gpt2(pretrained=False, **kwargs):
     model = GPT2ForSequenceClassification.from_pretrained("gpt2", num_labels=2, **kwargs)
+    model.config.num_labels = 2
+
+    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    tokenizer.pad_token = tokenizer.eos_token  # Use eos_token as padding token
+
+    model.config.pad_token_id = tokenizer.pad_token_id
     return model
