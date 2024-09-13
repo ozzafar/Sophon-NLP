@@ -151,27 +151,14 @@ class GPT2SentimentAnalysisZeroShot(GPT2LMHeadModel):
 
         outputs = super().__call__(*args, **kwargs)
 
-        # The raw scores (unnormalized probabilities) for all tokens
-        logits = outputs.logits
-
-        # Get the logits for the last token in the input
-        last_token_logits = logits[0, -1, :]  # Shape: (vocab_size,)
-
         # Token IDs for "positive" and "negative"
-        # TODO make constand and remove tokenizer
-        # TODO try good/bad
+        # TODO make constant and remove tokenizer
         negative_id = self.tokenizer.encode("negative", add_special_tokens=False)[0]
         positive_id = self.tokenizer.encode("positive", add_special_tokens=False)[0]
 
-        sentiment_logits = torch.tensor([last_token_logits[negative_id], last_token_logits[positive_id]]).numpy()
-
-        # Apply softmax to get probabilities
-        sentiment_probabilities = softmax(sentiment_logits)
-
-        positive_prob = sentiment_probabilities[1]
-
-        # override/add result to outputs
-        return positive_prob
+        # Get the logits for the last position
+        outputs.logits = outputs.logits[:, -1, [negative_id, positive_id]]
+        return outputs
 
 def gpt2_zeroshot(pretrained=False, **kwargs):
     model = GPT2SentimentAnalysisZeroShot.from_pretrained("gpt2", **kwargs)
