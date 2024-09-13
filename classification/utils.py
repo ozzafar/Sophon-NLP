@@ -1045,8 +1045,8 @@ def test_original(model, original_testloader, device):
 
 def test_finetune(model, trainset, testset, epochs, lr):
     model = nn.DataParallel(model,device_ids=[0,1])
-    trainloader = DataLoader(trainset, batch_size=256, shuffle=True, num_workers=4,drop_last=True)
-    testloader = DataLoader(testset, batch_size=256, shuffle=False, num_workers=4,drop_last=True)
+    trainloader = DataLoader(trainset, batch_size=16, shuffle=True, num_workers=4,drop_last=True)
+    testloader = DataLoader(testset, batch_size=16, shuffle=False, num_workers=4,drop_last=True)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
     criterion = nn.CrossEntropyLoss()
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
@@ -1119,8 +1119,8 @@ if __name__ == '__main__':
             testset = DatasetSplit(test_dataset_all, np.squeeze(np.argwhere(np.isin(test_dataset_all.targets, config.img_net_classes))), config.img_net_classes)
             train_dataset_all =datasets.ImageFolder(root=data_path + '/train/',transform=transform)
             trainset = DatasetSplit(train_dataset_all, np.squeeze(np.argwhere(np.isin(train_dataset_all.targets, config.img_net_classes))), config.img_net_classes)   
-            trainloader = DataLoader(trainset, batch_size=256, shuffle=True, num_workers=4)
-            testloader = DataLoader(testset, batch_size=256, shuffle=True, num_workers=4)
+            trainloader = DataLoader(trainset, batch_size=16, shuffle=True, num_workers=4)
+            testloader = DataLoader(testset, batch_size=16, shuffle=True, num_workers=4)
             image_train = []
             image_test = []
             target_train = []

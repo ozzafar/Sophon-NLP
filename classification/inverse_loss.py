@@ -70,8 +70,8 @@ def fast_adapt_multibatch(batches, learner, loss, shots, ways, device):
             current_grads = learner.adapt(adaptation_error,None, allow_nograd=True) #allow_nograd?
         else:
             last_grads = current_grads
-            current_grads = learner.adapt(adaptation_error,last_grads) 
-        predictions = learner(evaluation_data)
+            current_grads = learner.adapt(adaptation_error,last_grads, allow_nograd=True) 
+        predictions = learner(evaluation_data).logits
         evaluation_error = loss(1-predictions, evaluation_labels)  
         evaluation_accuracy = accuracy(predictions, evaluation_labels)
         test_loss += evaluation_error*current_test
@@ -81,8 +81,8 @@ def fast_adapt_multibatch(batches, learner, loss, shots, ways, device):
 
 def test_finetune(model, trainset, testset, epochs, lr):
     model = nn.DataParallel(model)
-    trainloader = DataLoader(trainset, batch_size=256, shuffle=True, num_workers=4,drop_last=True)
-    testloader = DataLoader(testset, batch_size=256, shuffle=False, num_workers=4,drop_last=True)
+    trainloader = DataLoader(trainset, batch_size=16, shuffle=True, num_workers=4,drop_last=True)
+    testloader = DataLoader(testset, batch_size=16, shuffle=False, num_workers=4,drop_last=True)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
     criterion = nn.CrossEntropyLoss()
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
@@ -101,8 +101,8 @@ def test_finetune(model, trainset, testset, epochs, lr):
 
 def test_finetune_final(mode, model, trainset, testset, epochs, lr):
     model = nn.DataParallel(model)
-    trainloader = DataLoader(trainset, batch_size=256, shuffle=True, num_workers=4,drop_last=True)
-    testloader = DataLoader(testset, batch_size=256, shuffle=False, num_workers=4,drop_last=True)
+    trainloader = DataLoader(trainset, batch_size=16, shuffle=True, num_workers=4,drop_last=True)
+    testloader = DataLoader(testset, batch_size=16, shuffle=False, num_workers=4,drop_last=True)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
     criterion = nn.CrossEntropyLoss()
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
@@ -110,10 +110,10 @@ def test_finetune_final(mode, model, trainset, testset, epochs, lr):
     # epochs = 1
     for ep in tqdm(range(epochs)):
         model.train()
-        for inputs, targets in tqdm(trainloader):
-            inputs, targets = inputs.cuda(), targets.cuda()  
-            outputs = model(inputs)
-            loss = criterion(outputs, targets)
+        for batch in tqdm(trainloader):
+            inputs, targets, attention_mask = torch.stack(batch["input_ids"], dim=1).cuda(), batch["label"].cuda(), torch.stack(batch["attention_mask"], dim=1).cuda()
+            outputs = model(inputs, attention_mask=attention_mask)
+            loss = criterion(outputs.logits, targets)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -157,11 +157,7 @@ def main(
         # torch.cuda.manual_seed(seed)
         device = torch.device('cuda')
     wandb.log({'seed':seed})
-<<<<<<< HEAD
     save_path = args.root + '/inverse_loss'+ '/'+args.arch+'_'+ args.dataset + '/'
-=======
-    save_path = args.root + '/inverse_loss' + '/' + args.arch+'_' + args.dataset + '/'
->>>>>>> 3db9b03d8f53b80fb3e79c2933623b7b3254db75
     adaptation_steps = args.adaptation_steps
     now = datetime.now()
     save_path = save_path + '/' + f'{now.month}_{now.day}_{now.hour}_{now.minute}_{now.second}/'
@@ -268,12 +264,11 @@ def main(
             except StopIteration:
                 original_iter = iter(original_trainloader)
                 batch = next(original_iter)
-            inputs, targets = batch
-            inputs, targets = inputs.cuda(), targets.cuda()       
+            inputs, targets, attention_mask = torch.stack(batch["input_ids"], dim=1).cuda(), batch["label"].cuda(), torch.stack(batch["attention_mask"], dim=1).cuda()
             # print(inputs.shape)
             natural_optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, targets) 
+            outputs = model(inputs, attention_mask=attention_mask)
+            loss = criterion(outputs.logits, targets) 
             loss.backward()
             avg_gradients = check_gradients(model)
             # print('check gradients!!!!!!!!!')

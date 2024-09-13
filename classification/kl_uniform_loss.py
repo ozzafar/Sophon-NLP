@@ -133,8 +133,8 @@ def partial_fast_adapt_multibatch(batches, learner, loss, shots, ways, device):
 
 def test_finetune(model, trainset, testset, epochs, lr):
     model = nn.DataParallel(model)
-    trainloader = DataLoader(trainset, batch_size=256, shuffle=True, num_workers=4,drop_last=True)
-    testloader = DataLoader(testset, batch_size=256, shuffle=False, num_workers=4,drop_last=True)
+    trainloader = DataLoader(trainset, batch_size=16, shuffle=True, num_workers=4,drop_last=True)
+    testloader = DataLoader(testset, batch_size=16, shuffle=False, num_workers=4,drop_last=True)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
     criterion = nn.CrossEntropyLoss()
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
@@ -153,8 +153,8 @@ def test_finetune(model, trainset, testset, epochs, lr):
 
 def test_finetune_final(mode, model, trainset, testset, epochs, lr):
     model = nn.DataParallel(model)
-    trainloader = DataLoader(trainset, batch_size=256, shuffle=True, num_workers=4,drop_last=True)
-    testloader = DataLoader(testset, batch_size=256, shuffle=False, num_workers=4,drop_last=True)
+    trainloader = DataLoader(trainset, batch_size=16, shuffle=True, num_workers=4,drop_last=True)
+    testloader = DataLoader(testset, batch_size=16, shuffle=False, num_workers=4,drop_last=True)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
     criterion = nn.CrossEntropyLoss()
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
