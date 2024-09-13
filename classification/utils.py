@@ -377,7 +377,7 @@ def get_dataset(dataset, data_path, subset="imagenette", args=None):
 
     elif dataset.upper() == 'IMDB':
         dataset = load_dataset("imdb").shuffle(seed=42)
-        train_dataset, test_dataset = dataset["train"].select(range(1000)), dataset["test"].select(range(100))
+        train_dataset, test_dataset = dataset["train"].select(range(5000)), dataset["test"].select(range(1000))
 
         # tokenization
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -612,6 +612,7 @@ def resume(resume_path):
     return model
 
 def initialize(args,model): #因为maml会多套一层 所以test_finetune里面的另写一个
+    print(model)
     if args.arch == 'res50':
         last_layer = model.module.module.fc
     elif args.arch == 'caformer': 
@@ -621,7 +622,9 @@ def initialize(args,model): #因为maml会多套一层 所以test_finetune里面
     elif args.arch == 'res34':
         last_layer = model.module.module.fc
     elif args.arch == 'vgg':
-        last_layer == model.module.module.fc
+        last_layer = model.module.module.fc
+    elif args.arch == "gpt2":
+        last_layer = model.module.module.score
     init.xavier_uniform_(last_layer.weight)
     if last_layer.bias is not None:
         init.zeros_(last_layer.bias)
@@ -718,10 +721,10 @@ def get_pretrained_model(args, partial_finetuned=False):
     elif args.arch == 'gpt2':
         from model import gpt2
         model = gpt2(pretrained=False).cuda()
-        # for param in model.parameters():
-        #     param.requires_grad = False
-        # for param in model.score.parameters():
-        #     param.requires_grad = True
+        for param in model.parameters():
+            param.requires_grad = False
+        for param in model.score.parameters():
+            param.requires_grad = True
         return model.cuda()
 
     elif args.arch == 'gpt2-zeroshot':
@@ -1005,13 +1008,12 @@ def test(model, original_testloader, device):
     criterion = nn.CrossEntropyLoss(reduction='sum')
     model.eval()
     with torch.no_grad():
-        for batch_idx, (inputs, targets) in enumerate(original_testloader):
-                
-            inputs, targets = inputs.to(device), targets.to(device)
-            outputs = model(inputs)
-            loss = criterion(outputs, targets) 
+        for batch_idx, batch in enumerate(original_testloader):
+            inputs, targets, attention_mask = torch.stack(batch["input_ids"], dim=1).cuda(), batch["label"].cuda(), torch.stack(batch["attention_mask"], dim=1).cuda()
+            outputs = model(inputs, attention_mask=attention_mask)
+            loss = criterion(outputs.logits, targets) 
             test_loss += loss.item()
-            _, predicted = outputs.max(1)
+            _, predicted = outputs.logits.max(1)
             # if batch_idx == 0:
             #     print(f'output is {outputs}') # check model whether NaN
             total += targets.size(0)
@@ -1027,13 +1029,13 @@ def test_original(model, original_testloader, device):
     criterion = nn.CrossEntropyLoss(reduction='sum')
     model.eval()
     with torch.no_grad():
-        for batch_idx, (inputs, targets) in enumerate(original_testloader):
-            inputs, targets = inputs.to(device), targets.to(device)
+        for batch_idx, batch in enumerate(original_testloader):
+            inputs, targets, attention_mask = torch.stack(batch["input_ids"], dim=1).cuda(), batch["label"].cuda(), torch.stack(batch["attention_mask"], dim=1).cuda()          
             # print(inputs.shape)
             outputs = model(inputs)
-            loss = criterion(outputs, targets)
+            loss = criterion(outputs.logits, targets)
             test_loss += loss.item()
-            _, predicted = outputs.max(1)
+            _, predicted = outputs.logits.max(1)
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
     acc = 100.*correct/total

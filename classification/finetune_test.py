@@ -49,17 +49,21 @@ def test_finetune_final(args, mode, model, trainset, testset, epochs, lr):
     model = nn.DataParallel(model)
     trainloader = DataLoader(trainset, batch_size=args.bs, shuffle=True, num_workers=4,drop_last=True)
     testloader = DataLoader(testset, batch_size=args.bs, shuffle=False, num_workers=4,drop_last=True)
-    optimizer = optim.SGD(model.module.score.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
+    # optimizer = optim.SGD(model.module.score.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
+    # optimizer = optim.SGD(model.module.score.parameters(), lr=2e-5, weight_decay=0.01)
+    optimizer = optim.SGD(model.module.score.parameters(), lr=2e-3, weight_decay=0.01)
+
+
     criterion = nn.CrossEntropyLoss()
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
     model.train()
-    model.enable_input_require_grads()
+    # model.enable_input_require_grads()
     accs = []
     losses = []
-    for ep in tqdm(range(epochs)):
+    for ep in tqdm(range(epochs), desc="epoch"):
         model.train()
         train_loss = 0
-        for batch in trainloader:
+        for batch in tqdm(trainloader, desc="batch"):
             inputs, targets, attention_mask = torch.stack(batch["input_ids"], dim=1).cuda(), batch["label"].cuda(), torch.stack(batch["attention_mask"], dim=1).cuda()
             outputs = model(inputs, attention_mask=attention_mask)
             loss = criterion(outputs.logits, targets)
@@ -68,12 +72,12 @@ def test_finetune_final(args, mode, model, trainset, testset, epochs, lr):
             loss.backward()
             optimizer.step()
         wandb.log({f'{mode}: train loss': train_loss / len(trainloader.dataset)})
-        # test_acc, test_loss = test(model, testloader, torch.device('cuda'))
-        # accs.append(test_acc)
-        # losses.append(test_loss)
-        # wandb.log({f'{mode}: test accuracy':test_acc, f'{mode}: test loss':test_loss,})
-    # print(f'test accuracy is {accs}, test loss is {losses}')
-    # return round(test_acc,2), round(test_loss,2)
+        test_acc, test_loss = test(model, testloader, torch.device('cuda'))
+        accs.append(test_acc)
+        losses.append(test_loss)
+        wandb.log({f'{mode}: test accuracy':test_acc, f'{mode}: test loss':test_loss,})
+    print(f'test accuracy is {accs}, test loss is {losses}')
+    return round(test_acc,2), round(test_loss,2)
 
 if __name__ == '__main__':
     args = args_parser()

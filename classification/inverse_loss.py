@@ -52,9 +52,9 @@ def fast_adapt_multibatch(batches, learner, loss, shots, ways, device):
     test_loss = 0
     test_accuracy = 0
     total_test = 0
+
     for index,batch in enumerate(batches):
-        data, labels = batch
-        data, labels = data.to(device), labels.to(device)
+        data, labels, attention_mask = torch.stack(batch["input_ids"], dim=1).cuda(), batch["label"].cuda(), torch.stack(batch["attention_mask"], dim=1).cuda()
         adaptation_indices = np.zeros(data.size(0), dtype=bool)
         # adaptation_indices[np.arange(shots*ways)] = True
         adaptation_indices[np.random.choice(np.arange(data.size(0)), shots*ways, replace=False)] = True
@@ -65,9 +65,9 @@ def fast_adapt_multibatch(batches, learner, loss, shots, ways, device):
         current_test = evaluation_data.shape[0]
         # print(current_test)
         total_test += current_test
-        adaptation_error = loss(learner(adaptation_data), adaptation_labels)
+        adaptation_error = loss(learner(adaptation_data).logits, adaptation_labels)
         if index == 0:
-            current_grads = learner.adapt(adaptation_error,None) 
+            current_grads = learner.adapt(adaptation_error,None, allow_nograd=True) #allow_nograd?
         else:
             last_grads = current_grads
             current_grads = learner.adapt(adaptation_error,last_grads) 
@@ -164,7 +164,7 @@ def main(
     os.makedirs(save_path, exist_ok=True)
     wandb.log({'save path': save_path})
     save_args_to_file(args, save_path+"args.json")
-    trainset_ori, testset_ori = get_dataset('ImageNet', '../../../datasets/', subset='imagenette', args=args)
+    trainset_ori, testset_ori = get_dataset(args.dataset, '../../../datasets', args=args) #get_dataset('ImageNet', '../../../datasets/', subset='imagenette', args=args)
     original_trainloader = DataLoader(trainset_ori, batch_size=args.bs, shuffle=True, num_workers=0)
     original_testloader = DataLoader(testset_ori, batch_size=args.bs, shuffle=False, num_workers=0)
     trainset_tar, testset_tar = get_dataset(args.dataset, '../../../datasets', args=args)
