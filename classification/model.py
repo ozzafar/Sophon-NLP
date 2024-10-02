@@ -142,28 +142,6 @@ model_urls = {
     'vgg19_bn': 'https://download.pytorch.org/models/vgg19_bn-c79401a0.pth',
 }
 
-class GPT2SentimentAnalysisZeroShot(GPT2LMHeadModel):
-    def __init__(self, config):
-        super().__init__(config)
-        self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-
-    def __call__(self, *args, **kwargs):
-
-        outputs = super().__call__(*args, **kwargs)
-
-        # Token IDs for "positive" and "negative"
-        # TODO make constant and remove tokenizer
-        negative_id = self.tokenizer.encode("negative", add_special_tokens=False)[0]
-        positive_id = self.tokenizer.encode("positive", add_special_tokens=False)[0]
-
-        # Get the logits for the last position
-        outputs.logits = outputs.logits[:, -1, [negative_id, positive_id]]
-        return outputs
-
-def gpt2_zeroshot(pretrained=False, **kwargs):
-    model = GPT2SentimentAnalysisZeroShot.from_pretrained("gpt2", **kwargs)
-    return model
-
 def gpt2(pretrained=False, **kwargs):
     model = GPT2ForSequenceClassification.from_pretrained("gpt2", num_labels=2, **kwargs)
     model.config.num_labels = 2

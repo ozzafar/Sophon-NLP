@@ -4,6 +4,8 @@
 import time
 import numpy as np
 from datasets import load_dataset
+from transformers import DataCollatorForLanguageModeling
+from datasets import Dataset as HGDataset
 from torch.nn import CrossEntropyLoss
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -383,15 +385,32 @@ def get_dataset(dataset, data_path, subset="imagenette", args=None):
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         tokenizer.pad_token = tokenizer.eos_token
 
-        preprocess_function = None
-        if args.arch == 'gpt2':
-            preprocess_function = lambda examples: tokenizer(examples["text"], truncation=True,  padding="max_length",  max_length=512)
-        elif args.arch == 'gpt2-zeroshot':
-            generate_prompt = lambda text: f"Analyze the sentiment of the following text: '{text}'. The sentiment is "
-            preprocess_function = lambda examples: tokenizer([generate_prompt(text) for text in examples["text"]], truncation=True,  padding="max_length",  max_length=512)
+        preprocess_function = lambda examples: tokenizer(examples["text"], truncation=True,  padding="max_length",  max_length=512)
 
         trainset = train_dataset.map(preprocess_function, batched=True)
         testset = test_dataset.map(preprocess_function, batched=True)
+
+    elif dataset.lower() == 'pile':
+        # Load the dataset from Hugging Face
+        dataset = load_dataset("EleutherAI/the_pile_deduplicated", streaming=True)
+        small_dataset =  dataset['train'].shuffle(seed=42, buffer_size=50000)
+        test_dataset = HGDataset.from_list(list(small_dataset.take(1000)))
+        train_dataset = HGDataset.from_list(list(small_dataset.skip(1000).take(10000)))
+
+        tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        tokenizer.pad_token = tokenizer.eos_token
+
+        def preprocess_function(examples):
+            inputs = tokenizer(examples["text"], truncation=True, padding="max_length", max_length=512)
+            inputs['label'] = inputs['input_ids'].copy()  # Create labels from input_ids
+            
+            # Shift the input_ids to the right by 1 for next token prediction
+            for i in range(len(inputs['input_ids'])):
+                inputs['label'][i] = inputs['input_ids'][i][1:] + [tokenizer.pad_token_id]  # Shifted sequence as label
+            return inputs
+
+        trainset = train_dataset.map(preprocess_function, batched=True)
+        testset = test_dataset.map(preprocess_function, batched=True) 
 
     else:
         exit('unknown dataset: %s'%dataset)

@@ -37,14 +37,6 @@ from utils import get_dataset, test_accuracy
 import wandb
 import timm
 
-
-def test_final(args, node, model, testset):
-    model = nn.DataParallel(model)
-    testloader = DataLoader(testset, batch_size=args.bs, shuffle=False, num_workers=4,drop_last=True)
-    model.eval()
-    acc, test_loss = test(model, testloader, torch.device('cuda'))
-    return round(acc,2), round(test_loss,2)
-
 def test_finetune_final(args, mode, model, trainset, testset, epochs, lr):
     model = nn.DataParallel(model)
     trainloader = DataLoader(trainset, batch_size=args.bs, shuffle=True, num_workers=4,drop_last=True)
@@ -106,12 +98,6 @@ if __name__ == '__main__':
     elif args.start == 'scratch':
         print('========test train from scratch=========')
         acc, test_loss = test_finetune_final(args, 'train from scratch/', model.cuda(), trainset_tar, testset_tar, args.truly_finetune_epochs, args.finetune_lr)
-
-    # ### train from scratch
-    elif args.start == 'test':
-        print('========test without train=========')
-        model = get_pretrained_model(args)
-        acc, test_loss = test_final(args, 'test/', model.cuda(), testset_tar)
 
     else:
         assert(0)
