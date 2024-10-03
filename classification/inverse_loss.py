@@ -6,6 +6,8 @@ from datetime import datetime
 import argparse
 import json
 import sys
+from transformers import GPT2LMHeadModel
+
 sys.path.append('../')
 def args_parser():
     parser = argparse.ArgumentParser(description='train N shadow models')
@@ -140,6 +142,7 @@ def main(
     print("Hostname:", hostname)
     ip_address = socket.gethostbyname(hostname)
     args.from_machine = ip_address
+    lm_model = GPT2LMHeadModel.from_pretrained("gpt2").cuda()
 
     wandb.init(
     project="sophon classification",  
@@ -268,7 +271,21 @@ def main(
             # print(inputs.shape)
             natural_optimizer.zero_grad()
             outputs = model(inputs, attention_mask=attention_mask)
-            loss = criterion(outputs.logits, targets) 
+            inputs, targets, attention_mask = torch.stack(batch["input_ids"], dim=1).cuda(), batch["label"].cuda(), torch.stack(batch["attention_mask"], dim=1).cuda()
+
+            outputs = model(input_ids=inputs, attention_mask=attention_mask, output_hidden_states=True)
+
+            last_hidden_state = outputs.hidden_states[-1]
+
+            with torch.no_grad():
+                mask = attention_mask == 1
+                next_token_indexes = (mask.cumsum(dim=1) * mask).argmax(dim=1)
+                next_token_indexes[next_token_indexes == 0] = -1
+
+            last_token_hidden_state = last_hidden_state[range(last_hidden_state.shape[0]), next_token_indexes]
+            logits = lm_model.lm_head(last_token_hidden_state)
+
+            loss = criterion(logits, targets)
             loss.backward()
             avg_gradients = check_gradients(model)
             # print('check gradients!!!!!!!!!')

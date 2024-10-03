@@ -4,7 +4,7 @@
 import time
 import numpy as np
 from datasets import load_dataset
-from transformers import DataCollatorForLanguageModeling
+from transformers import DataCollatorForLanguageModeling, GPT2LMHeadModel
 from datasets import Dataset as HGDataset
 from torch.nn import CrossEntropyLoss
 import torch
@@ -393,7 +393,7 @@ def get_dataset(dataset, data_path, subset="imagenette", args=None):
     elif dataset.lower() == 'pile':
         # Load the dataset from Hugging Face
         dataset = load_dataset("EleutherAI/the_pile_deduplicated", streaming=True)
-        small_dataset =  dataset['train'].shuffle(seed=42, buffer_size=50000)
+        small_dataset = dataset['train'].shuffle(seed=42, buffer_size=50000)
         test_dataset = HGDataset.from_list(list(small_dataset.take(1000)))
         train_dataset = HGDataset.from_list(list(small_dataset.skip(1000).take(10000)))
 
@@ -401,13 +401,26 @@ def get_dataset(dataset, data_path, subset="imagenette", args=None):
         tokenizer.pad_token = tokenizer.eos_token
 
         def preprocess_function(examples):
-            inputs = tokenizer(examples["text"], truncation=True, padding="max_length", max_length=512)
-            inputs['label'] = inputs['input_ids'].copy()  # Create labels from input_ids
-            
-            # Shift the input_ids to the right by 1 for next token prediction
-            for i in range(len(inputs['input_ids'])):
-                inputs['label'][i] = inputs['input_ids'][i][1:] + [tokenizer.pad_token_id]  # Shifted sequence as label
-            return inputs
+            tokenized_inputs = tokenizer(examples["text"], truncation=True, max_length=512)
+
+            input_ids = [tokens[:-1] for tokens in tokenized_inputs['input_ids']]  # Remove the last token
+            labels = [tokens[-1] for tokens in tokenized_inputs['input_ids']]  # Get the last token as label
+
+            # Pad the input_ids to max_length
+            padded_inputs = tokenizer.pad(
+                {"input_ids": input_ids},
+                padding="max_length",
+                max_length=512,  # One token less to account for truncation
+                return_tensors="pt"  # Return PyTorch tensors
+            )
+
+            attention_mask = (padded_inputs["input_ids"] != tokenizer.pad_token_id).long()
+
+            return {
+                "input_ids": padded_inputs["input_ids"],
+                "attention_mask": attention_mask,
+                "label": labels
+            }
 
         trainset = train_dataset.map(preprocess_function, batched=True)
         testset = test_dataset.map(preprocess_function, batched=True) 
@@ -1046,15 +1059,23 @@ def test_original(model, original_testloader, device):
     correct = 0
     total = 0
     criterion = nn.CrossEntropyLoss(reduction='sum')
+    lm_model = GPT2LMHeadModel.from_pretrained("gpt2").cuda()
     model.eval()
     with torch.no_grad():
         for batch_idx, batch in enumerate(original_testloader):
             inputs, targets, attention_mask = torch.stack(batch["input_ids"], dim=1).cuda(), batch["label"].cuda(), torch.stack(batch["attention_mask"], dim=1).cuda()          
-            # print(inputs.shape)
-            outputs = model(inputs)
-            loss = criterion(outputs.logits, targets)
+
+            outputs = model(input_ids=inputs, attention_mask=attention_mask, output_hidden_states=True)
+            last_hidden_state = outputs.hidden_states[-1]
+            mask = attention_mask == 1
+            next_token_indexes = (mask.cumsum(dim=1) * mask).argmax(dim=1)
+            next_token_indexes[next_token_indexes == 0] = -1
+            last_token_hidden_state = last_hidden_state[range(last_hidden_state.shape[0]), next_token_indexes]
+            logits = lm_model.lm_head(last_token_hidden_state)
+
+            loss = criterion(logits, targets)
             test_loss += loss.item()
-            _, predicted = outputs.logits.max(1)
+            _, predicted = logits.max(1)
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
     acc = 100.*correct/total
