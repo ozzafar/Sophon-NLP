@@ -270,18 +270,13 @@ def main(
             inputs, targets, attention_mask = torch.stack(batch["input_ids"], dim=1).cuda(), batch["label"].cuda(), torch.stack(batch["attention_mask"], dim=1).cuda()
             # print(inputs.shape)
             natural_optimizer.zero_grad()
-            outputs = model(inputs, attention_mask=attention_mask)
-            inputs, targets, attention_mask = torch.stack(batch["input_ids"], dim=1).cuda(), batch["label"].cuda(), torch.stack(batch["attention_mask"], dim=1).cuda()
-
             outputs = model(input_ids=inputs, attention_mask=attention_mask, output_hidden_states=True)
 
             last_hidden_state = outputs.hidden_states[-1]
-
             with torch.no_grad():
                 mask = attention_mask == 1
                 next_token_indexes = (mask.cumsum(dim=1) * mask).argmax(dim=1)
                 next_token_indexes[next_token_indexes == 0] = -1
-
             last_token_hidden_state = last_hidden_state[range(last_hidden_state.shape[0]), next_token_indexes]
             logits = lm_model.lm_head(last_token_hidden_state)
 
