@@ -268,7 +268,6 @@ def main(
                 original_iter = iter(original_trainloader)
                 batch = next(original_iter)
             inputs, targets, attention_mask = torch.stack(batch["input_ids"], dim=1).cuda(), batch["label"].cuda(), torch.stack(batch["attention_mask"], dim=1).cuda()
-            # print(inputs.shape)
             natural_optimizer.zero_grad()
             outputs = model(input_ids=inputs, attention_mask=attention_mask, output_hidden_states=True)
 
