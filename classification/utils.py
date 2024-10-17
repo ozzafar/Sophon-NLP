@@ -4,7 +4,7 @@
 import time
 import numpy as np
 from datasets import load_dataset
-from transformers import DataCollatorForLanguageModeling, GPT2LMHeadModel
+from transformers import GPT2LMHeadModel, GPT2ForSequenceClassification
 from datasets import Dataset as HGDataset
 from torch.nn import CrossEntropyLoss
 import torch
@@ -379,7 +379,7 @@ def get_dataset(dataset, data_path, subset="imagenette", args=None):
 
     elif dataset.upper() == 'IMDB':
         dataset = load_dataset("imdb").shuffle(seed=42)
-        train_dataset, test_dataset = dataset["train"].select(range(5000)), dataset["test"].select(range(1000))
+        train_dataset, test_dataset = dataset["train"].select(range(25000)), dataset["test"].select(range(1000))
 
         # tokenization
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -773,7 +773,22 @@ def get_pretrained_model(args, partial_finetuned=False):
         assert(0)
 
 def get_finetuned_model(args, our_path, partial_finetuned=False):
-   
+    if args.arch == 'gpt2':
+        model = GPT2ForSequenceClassification.from_pretrained("gpt2", num_labels=2)
+        model.config.num_labels = 2
+        tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        tokenizer.pad_token = tokenizer.eos_token  # Use eos_token as padding token
+        model.config.pad_token_id = tokenizer.pad_token_id
+
+        state_dict = process(torch.load(our_path)['model'])
+        model.load_state_dict(state_dict)
+        if partial_finetuned:
+            for param in model.parameters():
+                param.requires_grad = False
+            for param in model.head.fc.fc2.parameters():
+                param.requires_grad = True
+        return model.cuda()
+
     if args.arch == 'caformer':
         model = timm.create_model("caformer_m36", pretrained=False)
         classifier = nn.Linear(2304, 10)

@@ -42,8 +42,7 @@ def test_finetune_final(args, mode, model, trainset, testset, epochs, lr):
     trainloader = DataLoader(trainset, batch_size=args.bs, shuffle=True, num_workers=4,drop_last=True)
     testloader = DataLoader(testset, batch_size=args.bs, shuffle=False, num_workers=4,drop_last=True)
     # optimizer = optim.SGD(model.module.score.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
-    # optimizer = optim.SGD(model.module.score.parameters(), lr=2e-5, weight_decay=0.01)
-    optimizer = optim.SGD(model.module.score.parameters(), lr=2e-3, weight_decay=0.01)
+    optimizer = optim.SGD(model.module.score.parameters(), lr=lr, weight_decay=0.01)
 
 
     criterion = nn.CrossEntropyLoss()

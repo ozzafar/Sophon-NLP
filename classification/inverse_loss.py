@@ -83,9 +83,9 @@ def fast_adapt_multibatch(batches, learner, loss, shots, ways, device):
 
 def test_finetune(model, trainset, testset, epochs, lr):
     model = nn.DataParallel(model)
-    trainloader = DataLoader(trainset, batch_size=16, shuffle=True, num_workers=4,drop_last=True)
-    testloader = DataLoader(testset, batch_size=16, shuffle=False, num_workers=4,drop_last=True)
-    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
+    trainloader = DataLoader(trainset, batch_size=8, shuffle=True, num_workers=4,drop_last=True)
+    testloader = DataLoader(testset, batch_size=8, shuffle=False, num_workers=4,drop_last=True)
+    optimizer = optim.SGD(model.parameters(), lr=lr, weight_decay=0.01)
     criterion = nn.CrossEntropyLoss()
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
     model.train()
