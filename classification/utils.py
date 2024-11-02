@@ -754,7 +754,7 @@ def get_pretrained_model(args, partial_finetuned=False):
         from model import gpt2
         model = gpt2(pretrained=False).cuda()
         for param in model.parameters():
-            param.requires_grad = False
+            param.requires_grad = True
         for param in model.score.parameters():
             param.requires_grad = True
         return model.cuda()
